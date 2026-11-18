@@ -4,6 +4,7 @@
  */
 package com.collapsibleclassic;
 
+import java.awt.Point;
 import java.awt.Rectangle;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -14,6 +15,7 @@ import net.runelite.api.gameval.VarClientID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.api.widgets.WidgetSizeMode;
 import net.runelite.api.widgets.WidgetType;
+import net.runelite.client.config.ConfigManager;
 
 /**
  * Draws the Resizable Classic side panel frame (tapered stone rows, pillars and backdrop) around the Resizable
@@ -27,6 +29,7 @@ import net.runelite.api.widgets.WidgetType;
 class ClassicFrame
 {
 	private static final int FRAME_WIDTH = 241, ROW_HEIGHT = 37, PANEL_HEIGHT = 261;
+	private static final int OPEN_HEIGHT = ROW_HEIGHT * 2 + PANEL_HEIGHT;
 	private static final int TOP_ROW_SPRITE = 1173, BOTTOM_ROW_SPRITE = 1174;
 	private static final int LEFT_PILLAR_SPRITE = 1175, RIGHT_PILLAR_SPRITE = 1176;
 	private static final int BACKDROP_SPRITE = 897;
@@ -75,10 +78,15 @@ class ClassicFrame
 	@Inject
 	private WidgetStates states;
 
+	@Inject
+	private ConfigManager configManager;
+
 	private boolean applied, framed, lastOpen;
 	private Rectangle lastGame;
 	private Widget shownWhileClosed;
 	private Rectangle leftBar, rightBar;
+	// Where the whole panel would sit when open, for the Alt-drag box; null while the frame is absent.
+	private Rectangle panelArea;
 	// Modern's own highlight, learned the first time it is seen, so it can be put back when the frame is removed.
 	private int modernSelected = -1;
 	private boolean modernTiling;
@@ -99,6 +107,21 @@ class ClassicFrame
 	Rectangle rightBar()
 	{
 		return rightBar;
+	}
+
+	/** The open panel's rectangle (the same whether open or closed), or null while the frame is absent. */
+	Rectangle panelArea()
+	{
+		return panelArea;
+	}
+
+	/**
+	 * Where the open panel's top-left corner was dragged to, or null for its normal place. Kept with Move side panel
+	 * off too, so it can be switched off (giving Alt-clicks back to the inventory) once the panel is placed.
+	 */
+	private Point savedPosition()
+	{
+		return configManager.getConfiguration(CollapsibleClassicConfig.GROUP, SidePanelMover.KEY, Point.class);
 	}
 
 	void apply()
@@ -128,8 +151,18 @@ class ClassicFrame
 		lastOpen = open;
 		lastGame = game;
 
+		// Normally against the bottom-right corner; moved, the open panel's top-left goes where it was dragged,
+		// kept on the screen. A closed panel keeps the open panel's bottom edge.
+		Point saved = savedPosition();
 		int x = game.x + game.width - FRAME_WIDTH;
-		int bottomY = game.y + game.height - ROW_HEIGHT;
+		int openTop = game.y + game.height - OPEN_HEIGHT;
+		if (saved != null)
+		{
+			x = Math.max(game.x, Math.min(saved.x, x));
+			openTop = Math.max(game.y, Math.min(saved.y, openTop));
+		}
+		panelArea = new Rectangle(x, openTop, FRAME_WIDTH, OPEN_HEIGHT);
+		int bottomY = openTop + OPEN_HEIGHT - ROW_HEIGHT;
 		int topY = bottomY - ROW_HEIGHT - (open ? PANEL_HEIGHT : 0);
 
 		// The bottom row is drawn first, so the backdrop and pillars go into it to sit under everything else.
@@ -151,6 +184,12 @@ class ClassicFrame
 		states.addSprite(lower, BOTTOM_ROW_SPRITE, false, new Rectangle(x, bottomY, FRAME_WIDTH, ROW_HEIGHT));
 		states.addSprite(upper, TOP_ROW_SPRITE, false, new Rectangle(x, topY, FRAME_WIDTH, ROW_HEIGHT));
 
+		// Moved away from the corner, the stone rows' own parents must not cut them off.
+		if (saved != null)
+		{
+			states.expandAncestors(topStones);
+			states.expandAncestors(bottomStones);
+		}
 		// Classic's stone containers are the full 241x37 row, with the stones at the top edge.
 		states.resize(topStones, FRAME_WIDTH, ROW_HEIGHT);
 		states.resize(bottomStones, FRAME_WIDTH, ROW_HEIGHT);
@@ -274,6 +313,7 @@ class ClassicFrame
 	{
 		leftBar = null;
 		rightBar = null;
+		panelArea = null;
 		// Hand the panel back hidden, unless the game has opened it in the meantime.
 		if (shownWhileClosed != null)
 		{
@@ -320,6 +360,7 @@ class ClassicFrame
 		{
 			return true;
 		}
+
 		for (int component : MODERN_LOGOUT)
 		{
 			Widget logout = client.getWidget(component);

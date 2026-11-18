@@ -19,6 +19,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.Client;
 import net.runelite.api.widgets.Widget;
+import net.runelite.api.widgets.WidgetPositionMode;
 import net.runelite.api.widgets.WidgetSizeMode;
 import net.runelite.api.widgets.WidgetType;
 
@@ -107,6 +108,13 @@ class WidgetStates
 			return;
 		}
 		capture(widget);
+		// Set as an ordinary top-left position as well as a forced one. Some pieces are laid out from the right
+		// edge of a parent that has been stretched, and a forced position below zero is ignored; either way the
+		// piece would otherwise jump. Both are put back on restore.
+		widget.setXPositionMode(WidgetPositionMode.ABSOLUTE_LEFT);
+		widget.setYPositionMode(WidgetPositionMode.ABSOLUTE_TOP);
+		widget.setOriginalX(x);
+		widget.setOriginalY(y);
 		widget.setForcedPosition(x, y);
 	}
 
@@ -222,7 +230,20 @@ class WidgetStates
 		expanded.clear();
 	}
 
+	/** True when the widget with this id has been stretched over the canvas. */
+	boolean isExpanded(int componentId)
+	{
+		return expanded.keySet().stream().anyMatch(widget -> widget.getId() == componentId);
+	}
+
 	private void expandAcrossCanvas(Widget widget)
+	{
+		expandAncestors(widget);
+		expand(widget);
+	}
+
+	/** Stretches a widget's parents over the canvas, so the widget can be placed anywhere without being cut off. */
+	void expandAncestors(Widget widget)
 	{
 		List<Widget> ancestors = new ArrayList<>();
 		for (Widget parent = widget.getParent(); parent != null && ancestors.size() < 16; parent = parent.getParent())
@@ -238,7 +259,6 @@ class WidgetStates
 		{
 			expand(parent);
 		}
-		expand(widget);
 	}
 
 	private boolean coversCanvas(Widget widget)
@@ -260,7 +280,21 @@ class WidgetStates
 		Map<Widget, Point> positions = new IdentityHashMap<>();
 		collect(parent.getStaticChildren(), positions);
 		collect(parent.getDynamicChildren(), positions);
-		collect(parent.getNestedChildren(), positions);
+		// A sub-interface (the orbs, for example) is left alone: the game places and sizes it from its parent,
+		// and only partly honours changes made to it directly. It is stretched along with its parent instead,
+		// and its own pieces are held where they were.
+		Widget[] nested = parent.getNestedChildren();
+		if (nested != null)
+		{
+			for (Widget root : nested)
+			{
+				if (root != null)
+				{
+					collect(root.getStaticChildren(), positions);
+					collect(root.getDynamicChildren(), positions);
+				}
+			}
+		}
 		positions.keySet().forEach(child ->
 		{
 			capture(child);
@@ -282,10 +316,22 @@ class WidgetStates
 		parent.setNoClickThrough(false);
 		parent.revalidate();
 
-		Rectangle now = bounds(parent);
+		if (nested != null)
+		{
+			for (Widget root : nested)
+			{
+				if (root != null)
+				{
+					root.revalidate();
+					// Treated as already stretched, so it is never altered directly later on.
+					expanded.put(root, true);
+				}
+			}
+		}
 		positions.forEach((child, canvas) ->
 		{
-			position(child, canvas.x - now.x, canvas.y - now.y);
+			Point origin = location(child.getParent());
+			position(child, canvas.x - origin.x, canvas.y - origin.y);
 			child.revalidate();
 		});
 	}

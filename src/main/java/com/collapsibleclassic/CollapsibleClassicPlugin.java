@@ -7,14 +7,22 @@ package com.collapsibleclassic;
 
 import com.google.inject.Provides;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.inject.Inject;
+import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.MenuEntry;
 import net.runelite.api.ScriptID;
 import net.runelite.api.events.BeforeRender;
+import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.MenuEntryAdded;
+import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.events.ScriptPreFired;
 import net.runelite.api.events.VarClientIntChanged;
@@ -27,19 +35,22 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.ProfileChanged;
+import net.runelite.client.input.KeyManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.itemstats.ItemStatPlugin;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.HotkeyListener;
 
 @PluginDescriptor(
 	name = "Collapsible Classic",
 	description = "Gives Resizable Modern the Resizable Classic side panel look, and keeps Modern's ability to collapse it. Optional Hitpoints and Prayer bars on the pillars.",
 	tags = {"classic", "resizable", "modern", "collapse", "layout", "stones", "status", "bars", "interface"},
-	conflicts = {"Interface Layout", "Fixed Resizable Hybrid", "Menu Stones Hider", "Custom Game Tabs"}
+	conflicts = {"Interface Layout", "Compact Orbs", "Fixed Resizable Hybrid", "Menu Stones Hider", "Custom Game Tabs"}
 )
+@Slf4j
 @PluginDependency(ItemStatPlugin.class)
 public class CollapsibleClassicPlugin extends Plugin
 {
@@ -47,6 +58,9 @@ public class CollapsibleClassicPlugin extends Plugin
 	// customisation, and a click on a side stone.
 	private static final int TOPLEVEL_SUBCHANGE = 903, PROC_TOPLEVEL_SUBCHANGE = 908;
 	private static final int TOPLEVEL_SIDEBUTTON_OP = 914, TOPLEVEL_SIDE_CUSTOMIZE = 919;
+	// Scripts that lay out the orbs around the minimap.
+	private static final int ORBS_UPDATE_STORE = 2396, ORBS_UPDATE_ACTIVITY = 2480;
+	private static final int WIKI_ICON_INIT = 3304, WORLD_MAP_UPDATE = 1700;
 
 	/**
 	 * RuneLite lets these pieces of Modern's interface be dragged while Alt is held. The frame stretches the stone
@@ -58,6 +72,15 @@ public class CollapsibleClassicPlugin extends Plugin
 		"RESIZABLE_VIEWPORT_BOTTOM_LINE_TABS2",
 		"RESIZABLE_VIEWPORT_BOTTOM_LINE_INVENTORY_PARENT"
 	);
+	// Moving an orb out of the minimap area stretches the minimap's container in the same way.
+	private static final String MINIMAP_DRAG_HANDLE = "RESIZABLE_MINIMAP_WIDGET";
+
+	private static final int[] MINIMAP_PIECES = {
+		InterfaceID.ToplevelPreEoc.MAP_NOCLICK_0, InterfaceID.ToplevelPreEoc.MAP_NOCLICK_1,
+		InterfaceID.ToplevelPreEoc.MAP_NOCLICK_2, InterfaceID.ToplevelPreEoc.MAP_NOCLICK_3,
+		InterfaceID.ToplevelPreEoc.MAP_NOCLICK_4, InterfaceID.ToplevelPreEoc.MAP_NOCLICK_5,
+		InterfaceID.ToplevelPreEoc.MINIMAP, InterfaceID.ToplevelPreEoc.MAP_MINIMAP_GRAPHIC9
+	};
 
 	@Inject
 	private Client client;
@@ -78,9 +101,47 @@ public class CollapsibleClassicPlugin extends Plugin
 	private ClassicFrame frame;
 
 	@Inject
+	private SidePanelMover sidePanelMover;
+
+	@Inject
 	private StatusBars statusBars;
 
+	@Inject
+	private MovableOrbs movableOrbs;
+
+	@Inject
+	private ConfigManager configManager;
+
+	@Inject
+	private KeyManager keyManager;
+
+	private final HotkeyListener defaultPositionsHotkey = new HotkeyListener(() -> config.defaultOrbPositionsKey())
+	{
+		@Override
+		public void hotkeyPressed()
+		{
+			configManager.setConfiguration(CollapsibleClassicConfig.GROUP, "defaultOrbPositions", !config.defaultOrbPositions());
+		}
+	};
+
 	private final List<Overlay> setAside = new ArrayList<>();
+	private int[] hiddenOrbs = {};
+	/** Orb widgets we marked as not click-through, with the value each had before. */
+	private final Map<Widget, Boolean> clickBlocked = new IdentityHashMap<>();
+
+	/**
+	 * The orbs and buttons around the minimap, in both copies of the orbs interface. Marking them stops a click on
+	 * an orb from also reaching the game world underneath (walking there), as Compact Orbs does.
+	 */
+	private static final int[] CLICK_BLOCKED_ORBS = {
+		InterfaceID.Orbs.ORB_HEALTH, InterfaceID.Orbs.ORB_PRAYER, InterfaceID.Orbs.ORB_RUNENERGY,
+		InterfaceID.Orbs.ORB_SPECENERGY, InterfaceID.Orbs.XP_DROPS, InterfaceID.Orbs.ORB_WORLDMAP,
+		InterfaceID.Orbs.WIKI, InterfaceID.Orbs.ORB_CONTENTRECOM, InterfaceID.Orbs.ORB_STORE,
+		InterfaceID.OrbsNomap.ORB_HEALTH, InterfaceID.OrbsNomap.ORB_PRAYER, InterfaceID.OrbsNomap.ORB_RUNENERGY,
+		InterfaceID.OrbsNomap.ORB_SPECENERGY, InterfaceID.OrbsNomap.XP_DROPS, InterfaceID.OrbsNomap.ORB_WORLDMAP,
+		InterfaceID.OrbsNomap.WIKI, InterfaceID.OrbsNomap.ORB_CONTENTRECOM, InterfaceID.OrbsNomap.ORB_STORE
+	};
+	private boolean minimapHandleSetAside;
 	private boolean running;
 	private boolean refreshPending;
 	private int scriptDepth;
@@ -95,10 +156,13 @@ public class CollapsibleClassicPlugin extends Plugin
 	protected void startUp()
 	{
 		overlayManager.add(statusBars);
+		keyManager.registerKeyListener(defaultPositionsHotkey);
 		clientThread.invokeLater(() ->
 		{
 			running = true;
 			scriptDepth = 0;
+			movableOrbs.start(this::refresh);
+			sidePanelMover.start(this::refresh);
 			refresh();
 		});
 	}
@@ -107,10 +171,13 @@ public class CollapsibleClassicPlugin extends Plugin
 	protected void shutDown()
 	{
 		overlayManager.remove(statusBars);
+		keyManager.unregisterKeyListener(defaultPositionsHotkey);
 		clientThread.invokeLater(() ->
 		{
 			running = false;
 			scriptDepth = 0;
+			movableOrbs.stop();
+			sidePanelMover.stop();
 			restore();
 			returnDragHandles();
 		});
@@ -130,15 +197,39 @@ public class CollapsibleClassicPlugin extends Plugin
 			return;
 		}
 		frame.apply();
-		if (config.hideXpButton())
+		hiddenOrbs = orbsToHide();
+		for (int orb : hiddenOrbs)
 		{
-			states.hide(client.getWidget(InterfaceID.Orbs.XP_DROPS));
+			states.hide(client.getWidget(orb));
 		}
-		if (frame.active())
+		if (config.preventOrbClickThrough())
 		{
+			for (int id : CLICK_BLOCKED_ORBS)
+			{
+				Widget orb = client.getWidget(id);
+				if (orb != null && !clickBlocked.containsKey(orb))
+				{
+					clickBlocked.put(orb, orb.getNoClickThrough());
+					orb.setNoClickThrough(true);
+				}
+			}
+		}
+		boolean active = frame.active();
+		movableOrbs.apply(active);
+		movableOrbs.syncHandles(active);
+
+		boolean minimapStretched = movableOrbs.isStretched();
+		if (!active || minimapStretched != minimapHandleSetAside)
+		{
+			returnDragHandles();
+		}
+		if (active)
+		{
+			minimapHandleSetAside = minimapStretched;
 			overlayManager.removeIf(overlay ->
 			{
-				if (!DRAG_HANDLES.contains(overlay.getName()))
+				String name = overlay.getName();
+				if (!DRAG_HANDLES.contains(name) && !(minimapStretched && MINIMAP_DRAG_HANDLE.equals(name)))
 				{
 					return false;
 				}
@@ -146,22 +237,23 @@ public class CollapsibleClassicPlugin extends Plugin
 				return true;
 			});
 		}
-		else
-		{
-			returnDragHandles();
-		}
 	}
 
 	private void restore()
 	{
+		clickBlocked.forEach(Widget::setNoClickThrough);
+		clickBlocked.clear();
 		frame.restore();
+		movableOrbs.restore();
 		states.restore();
+		movableOrbs.afterRestore();
 	}
 
 	private void returnDragHandles()
 	{
 		setAside.forEach(overlayManager::add);
 		setAside.clear();
+		minimapHandleSetAside = false;
 	}
 
 	private synchronized void scheduleRefresh()
@@ -182,7 +274,9 @@ public class CollapsibleClassicPlugin extends Plugin
 	{
 		return id == ScriptID.TOPLEVEL_REDRAW || id == ScriptID.TOPLEVEL_RESIZE_CUSTOMISE
 			|| id == TOPLEVEL_SUBCHANGE || id == PROC_TOPLEVEL_SUBCHANGE
-			|| id == TOPLEVEL_SIDE_CUSTOMIZE || id == TOPLEVEL_SIDEBUTTON_OP;
+			|| id == TOPLEVEL_SIDE_CUSTOMIZE || id == TOPLEVEL_SIDEBUTTON_OP
+			|| id == ORBS_UPDATE_STORE || id == ORBS_UPDATE_ACTIVITY || id == WORLD_MAP_UPDATE
+			|| id == WIKI_ICON_INIT || id == ScriptID.WIKI_ICON_UPDATE;
 	}
 
 	// The game's layout scripts must see its own, untouched interface. Everything is undone before the outermost
@@ -218,21 +312,78 @@ public class CollapsibleClassicPlugin extends Plugin
 	@Subscribe(priority = -2)
 	public void onBeforeRender(BeforeRender event)
 	{
-		if (running && scriptDepth == 0 && client.getGameState() == GameState.LOGGED_IN
-			&& (frame.stale() || xpButtonShowing()))
+		if (!running || scriptDepth > 0 || client.getGameState() != GameState.LOGGED_IN)
+		{
+			return;
+		}
+		if (frame.stale() || hiddenOrbShowing())
 		{
 			refresh();
 		}
+		movableOrbs.enforce();
 	}
 
-	private boolean xpButtonShowing()
+	/** The game re-shows orbs through its own scripts, so this is checked before every frame. */
+	private boolean hiddenOrbShowing()
 	{
-		if (!config.hideXpButton())
+		for (int orb : hiddenOrbs)
 		{
-			return false;
+			Widget widget = client.getWidget(orb);
+			if (widget != null && !widget.isSelfHidden())
+			{
+				return true;
+			}
 		}
-		Widget button = client.getWidget(InterfaceID.Orbs.XP_DROPS);
-		return button != null && !button.isSelfHidden();
+		return false;
+	}
+
+	private int[] orbsToHide()
+	{
+		List<Integer> orbs = new ArrayList<>();
+		// With the minimap minimised the game swaps in a second copy of the orbs (OrbsNomap), so both are hidden.
+		addIf(orbs, config.hideHitpointsOrb(), InterfaceID.Orbs.ORB_HEALTH, InterfaceID.OrbsNomap.ORB_HEALTH);
+		addIf(orbs, config.hidePrayerOrb(), InterfaceID.Orbs.ORB_PRAYER, InterfaceID.OrbsNomap.ORB_PRAYER);
+		addIf(orbs, config.hideRunOrb(), InterfaceID.Orbs.ORB_RUNENERGY, InterfaceID.OrbsNomap.ORB_RUNENERGY);
+		addIf(orbs, config.hideSpecialOrb(), InterfaceID.Orbs.ORB_SPECENERGY, InterfaceID.OrbsNomap.ORB_SPECENERGY);
+		addIf(orbs, config.hideXpButton(), InterfaceID.Orbs.XP_DROPS, InterfaceID.OrbsNomap.XP_DROPS);
+		addIf(orbs, config.hideWorldMapOrb(), InterfaceID.Orbs.ORB_WORLDMAP, InterfaceID.OrbsNomap.ORB_WORLDMAP);
+		addIf(orbs, config.hideWikiBanner(), InterfaceID.Orbs.WIKI, InterfaceID.OrbsNomap.WIKI);
+		addIf(orbs, config.hideActivityOrb(), InterfaceID.Orbs.ORB_CONTENTRECOM, InterfaceID.OrbsNomap.ORB_CONTENTRECOM);
+		addIf(orbs, config.hideStoreOrb(), InterfaceID.Orbs.ORB_STORE, InterfaceID.OrbsNomap.ORB_STORE);
+		addIf(orbs, config.hideCompass(),
+			InterfaceID.ToplevelPreEoc.MAP_MINIMAP_GRAPHIC6, InterfaceID.ToplevelPreEoc.COMPASSCLICK);
+		if (minimapHidden(config))
+		{
+			for (int piece : MINIMAP_PIECES)
+			{
+				orbs.add(piece);
+			}
+		}
+		return orbs.stream().mapToInt(Integer::intValue).toArray();
+	}
+
+	/** Hide minimap applies unless default positions are on and set to bring the minimap back. */
+	static boolean minimapHidden(CollapsibleClassicConfig config)
+	{
+		return presetActive(config)
+			|| config.hideMinimap() && !(config.defaultOrbPositions() && config.defaultPositionsShowMinimap());
+	}
+
+	/** A ready-made layout is chosen, and Default orb positions is not overriding it. */
+	static boolean presetActive(CollapsibleClassicConfig config)
+	{
+		return config.orbLayout() != OrbLayout.CUSTOM && !config.defaultOrbPositions();
+	}
+
+	private static void addIf(List<Integer> orbs, boolean hide, int... components)
+	{
+		if (hide)
+		{
+			for (int component : components)
+			{
+				orbs.add(component);
+			}
+		}
 	}
 
 	@Subscribe(priority = -2)
@@ -263,11 +414,85 @@ public class CollapsibleClassicPlugin extends Plugin
 		}
 	}
 
+	/** Typing ::ccdebug in the chat writes a report of the orbs' state to the log and the chat box. */
+	@Subscribe
+	public void onCommandExecuted(CommandExecuted event)
+	{
+		if (!"ccdebug".equalsIgnoreCase(event.getCommand()))
+		{
+			return;
+		}
+		List<String> lines = movableOrbs.debugReport();
+		for (String line : lines)
+		{
+			log.info("[CC debug] {}", line);
+		}
+		for (String line : lines)
+		{
+			if (line.startsWith("moveOrbs") || line.startsWith("WORLD_MAP:") || line.startsWith("WIKI:"))
+			{
+				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "CC debug " + line, null);
+			}
+		}
+		client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "CC debug: full report written to the log ("
+			+ lines.size() + " lines, search for CC debug)", null);
+	}
+
+	/** The interface group of the orbs beside the full minimap (not the minimised-minimap copy). */
+	private static final int ORBS_GROUP = InterfaceID.Orbs.UNIVERSE >>> 16;
+
+	/**
+	 * The world map orb's right-click option to minimise the minimap. Instead of switching the game to its
+	 * minimised layout, it flips Hide minimap, so the minimap goes and comes back exactly as with that setting.
+	 * Left alone when a preset hides the minimap anyway, and in the game's own minimised layout, so that layout's
+	 * own option can still restore it.
+	 */
+	private boolean minimapToggle(String option, String target, int widgetId)
+	{
+		if (!running || !frame.active() || presetActive(config) || widgetId == -1 || widgetId >>> 16 != ORBS_GROUP)
+		{
+			return false;
+		}
+		String text = ((option == null ? "" : option) + " " + (target == null ? "" : target)).toLowerCase();
+		return text.contains("minimap") || text.contains("minimise") || text.contains("minimize");
+	}
+
+	@Subscribe
+	public void onMenuEntryAdded(MenuEntryAdded event)
+	{
+		MenuEntry entry = event.getMenuEntry();
+		if (minimapToggle(entry.getOption(), entry.getTarget(), entry.getParam1()) && minimapHidden(config))
+		{
+			entry.setOption("Restore minimap");
+			entry.setTarget("");
+		}
+	}
+
+	@Subscribe
+	public void onMenuOptionClicked(MenuOptionClicked event)
+	{
+		if (minimapToggle(event.getMenuOption(), event.getMenuTarget(), event.getParam1()))
+		{
+			event.consume();
+			configManager.setConfiguration(CollapsibleClassicConfig.GROUP, "hideMinimap", !minimapHidden(config));
+		}
+	}
+
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
 		if (running && CollapsibleClassicConfig.GROUP.equals(event.getGroup()))
 		{
+			if ("resetOrbPositions".equals(event.getKey()) && "true".equals(event.getNewValue()))
+			{
+				// A one-shot switch: forget every dragged position, then untick itself.
+				clientThread.invokeLater(() ->
+				{
+					movableOrbs.resetAllPositions();
+					sidePanelMover.resetPosition();
+					configManager.setConfiguration(CollapsibleClassicConfig.GROUP, "resetOrbPositions", false);
+				});
+			}
 			scheduleRefresh();
 		}
 	}

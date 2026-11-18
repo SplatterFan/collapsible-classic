@@ -138,7 +138,7 @@ class StatusBars extends Overlay
 		graphics.fillRect(area.x + BORDER, area.y + BORDER + (area.height - filled),
 			area.width - BORDER * 2, filled - BORDER * 2);
 
-		if (config.restorePreview() && restore > 0)
+		if (restore > 0)
 		{
 			int restored = height(maximum, restore, area.height);
 			int fillY, fillHeight;

@@ -14,6 +14,11 @@ Copyright (c) 2016-2017, Adam <Adam@sigterm.info>
 Copyright (c) 2026, Frederick Campbell
 Copyright (c) 2026, wukuna
 
+The orb movement follows the approach of Compact Orbs
+(https://github.com/its-cue/compact-orbs):
+
+Copyright (c) 2025, its-cue
+
 The status bars are adapted from RuneLite's Status Bars plugin
 (https://github.com/runelite/runelite):
 
