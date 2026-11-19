@@ -130,6 +130,14 @@ class MovableOrbs
 	private Runnable refresh = () -> { };
 	private boolean running;
 
+	/** True while another plugin (Compact Orbs) owns the orbs, so nothing here may touch them. */
+	private boolean standDown;
+
+	void setStandDown(boolean standDown)
+	{
+		this.standDown = standDown;
+	}
+
 	void start(Runnable refresh)
 	{
 		this.refresh = refresh;
@@ -158,7 +166,7 @@ class MovableOrbs
 	/** Orbs can be moved at all, and default positions are not switched on. */
 	private boolean moving()
 	{
-		return config.moveOrbs() && !config.defaultOrbPositions() && !CollapsibleClassicPlugin.presetActive(config);
+		return config.moveOrbs() && !CollapsibleClassicPlugin.defaultsOn(config) && !CollapsibleClassicPlugin.presetActive(config);
 	}
 
 	/** Lays out moved orbs, the compass ring and the on-screen button. Call after {@link #restore()}. */
@@ -243,7 +251,7 @@ class MovableOrbs
 		// The ring is needed whenever the compass itself has been dragged, wherever the minimap is, and whenever
 		// the minimap (whose surround normally provides the ring) is hidden.
 		boolean minimapHidden = CollapsibleClassicPlugin.minimapHidden(config);
-		boolean compassHidden = config.hideCompass();
+		boolean compassHidden = config.compass().hiddenIn(CollapsibleClassicPlugin.defaultLayout(config));
 		boolean compassDetached = minimapHidden || targets.containsKey(Orb.COMPASS)
 			&& (saved(Orb.COMPASS) != null || CollapsibleClassicPlugin.presetActive(config));
 		if (!compassHidden && compass != null && compassAt != null && compassDetached && compass.getParent() != null)
@@ -441,10 +449,10 @@ class MovableOrbs
 		lines.add("canvas=" + client.getCanvasWidth() + "x" + client.getCanvasHeight() + " real=" + real.width + "x" + real.height
 			+ " stretchedMode=" + client.isStretchedEnabled() + " resized=" + client.isResized()
 			+ " toplevel=" + client.getTopLevelInterfaceId());
-		lines.add("layout=" + config.orbLayout().name() + " hideCompass=" + config.hideCompass());
+		lines.add("layout=" + config.orbLayout().name() + " compass=" + config.compass().name());
 		lines.add("moveOrbs=" + config.moveOrbs() + " defaults=" + config.defaultOrbPositions() + " moving=" + moving()
-			+ " stretched=" + stretched + " held=" + held.size() + " hideWorldMap=" + config.hideWorldMapOrb()
-			+ " hideWiki=" + config.hideWikiBanner() + " hideMinimap=" + config.hideMinimap());
+			+ " stretched=" + stretched + " held=" + held.size() + " worldMap=" + config.worldMapOrb().name()
+			+ " wiki=" + config.wikiBanner().name() + " minimap=" + config.minimap().name());
 		for (Orb orb : Orb.values())
 		{
 			Point saved = saved(orb);
@@ -527,7 +535,8 @@ class MovableOrbs
 	 */
 	void fixOrbsRootSize()
 	{
-		if (stretched)
+		// Compact Orbs sizes this sub-interface itself; never fight it.
+		if (stretched || standDown)
 		{
 			return;
 		}
@@ -594,7 +603,7 @@ class MovableOrbs
 		at = new Point(Math.max(0, Math.min(at.x, canvas.width - TOGGLE_SIZE)),
 			Math.max(0, Math.min(at.y, canvas.height - TOGGLE_SIZE)));
 		Point origin = WidgetStates.location(frame);
-		boolean defaults = config.defaultOrbPositions();
+		boolean defaults = CollapsibleClassicPlugin.defaultsOn(config);
 
 		Widget button = states.addChild(frame, WidgetType.GRAPHIC);
 		button.setSpriteId(defaults ? SpriteID.GroundItemsVisibility._1 : SpriteID.GroundItemsVisibility._0);

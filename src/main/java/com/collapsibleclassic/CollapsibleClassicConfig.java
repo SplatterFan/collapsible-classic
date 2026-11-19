@@ -14,26 +14,58 @@ public interface CollapsibleClassicConfig extends Config
 	String GROUP = "collapsibleclassic";
 
 	@ConfigSection(
+		name = "Collapsible side panel",
+		description = "The classic frame around Resizable Modern's side panel, which still collapses when you click the open tab. Hold Alt and drag the bottom stone row to move the whole panel; Alt right-click there puts it back in the corner.",
+		position = 0
+	)
+	String sidePanelSection = "sidePanel";
+
+	@ConfigSection(
 		name = "Orbs",
-		description = "Orb layout, moving the orbs with Alt, and hiding individual orbs and buttons around the minimap.",
-		position = 7
+		description = "Optional orb features: moving the orbs with Alt, preset layouts and default positions. Off by default, and switched off automatically while the Compact Orbs plugin is on.",
+		position = 2,
+		closedByDefault = true
 	)
 	String orbsSection = "orbs";
 
 	@ConfigSection(
 		name = "Orb visibility",
-		description = "Hide individual orbs, buttons, the compass or the minimap in Resizable Modern.",
-		position = 8,
+		description = "Choose when each orb, button, the compass and the minimap is hidden: in the default layout, in your moved layout, or both. Needs Orb features on.",
+		position = 3,
 		closedByDefault = true
 	)
 	String orbVisibilitySection = "orbVisibility";
+
+	@ConfigItem(
+		keyName = "orbFeatures",
+		name = "Orb features",
+		description = "Turn on this plugin's orb features (everything below and in Orb visibility). While off, or while the Compact Orbs plugin is on, the minimap and orbs are left completely alone.",
+		section = orbsSection,
+		position = 0
+	)
+	default boolean orbFeatures()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "hideLogoutX",
+		name = "Hide Modern logout X",
+		description = "Hide Resizable Modern's logout X by the minimap, since the side panel has its own logout stone. Switches itself off while Compact Orbs is running: use its own Hide logout X setting then.",
+		section = sidePanelSection,
+		position = 1
+	)
+	default boolean hideLogoutX()
+	{
+		return true;
+	}
 
 	@ConfigItem(
 		keyName = "orbLayout",
 		name = "Orb layout",
 		description = "Pick a ready-made compact layout (the minimap is hidden and the orbs packed into the top-right corner), or Custom to place them yourself with Move orbs.",
 		section = orbsSection,
-		position = 0
+		position = 1
 	)
 	default OrbLayout orbLayout()
 	{
@@ -45,7 +77,7 @@ public interface CollapsibleClassicConfig extends Config
 		name = "Move orbs",
 		description = "Let the orbs, compass and minimap (or a whole preset layout) be dragged anywhere while Alt is held. Alt right-click puts it back.",
 		section = orbsSection,
-		position = 1
+		position = 2
 	)
 	default boolean moveOrbs()
 	{
@@ -55,9 +87,9 @@ public interface CollapsibleClassicConfig extends Config
 	@ConfigItem(
 		keyName = "defaultOrbPositions",
 		name = "Default orb positions",
-		description = "Show the orbs, compass and minimap in their normal places. Your dragged positions are kept and come back when this is switched off.",
+		description = "Show the orbs, compass, minimap and multi-combat icon in their normal places. Your dragged positions are kept and come back when this is switched off.",
 		section = orbsSection,
-		position = 2
+		position = 3
 	)
 	default boolean defaultOrbPositions()
 	{
@@ -69,7 +101,7 @@ public interface CollapsibleClassicConfig extends Config
 		name = "Default positions hotkey",
 		description = "A key that switches Default orb positions on and off.",
 		section = orbsSection,
-		position = 3
+		position = 4
 	)
 	default Keybind defaultOrbPositionsKey()
 	{
@@ -77,11 +109,23 @@ public interface CollapsibleClassicConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "movedWhenCollapsed",
+		name = "Moved layout only when collapsed",
+		description = "Use the default orb layout while the side panel is open, and switch to your moved layout (dragged orbs or a preset) when you collapse it. While on, this decides by itself and Default orb positions (and its hotkey and eye button) is ignored.",
+		section = orbsSection,
+		position = 5
+	)
+	default boolean movedWhenCollapsed()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 		keyName = "onScreenToggle",
 		name = "On-screen toggle",
 		description = "With Move orbs on, show a small button on the game screen that switches Default orb positions on and off. Drag it with Alt like the orbs.",
 		section = orbsSection,
-		position = 5
+		position = 6
 	)
 	default boolean onScreenToggle()
 	{
@@ -89,23 +133,11 @@ public interface CollapsibleClassicConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "defaultPositionsShowMinimap",
-		name = "Show minimap with defaults",
-		description = "While Default orb positions is on, show the minimap even if Hide minimap is ticked.",
-		section = orbsSection,
-		position = 4
-	)
-	default boolean defaultPositionsShowMinimap()
-	{
-		return true;
-	}
-
-	@ConfigItem(
 		keyName = "preventOrbClickThrough",
 		name = "Prevent orb click-through",
 		description = "Stop clicks on the orbs and buttons around the minimap from also reaching the game world underneath, so clicking an orb never walks you somewhere.",
 		section = orbsSection,
-		position = 6
+		position = 7
 	)
 	default boolean preventOrbClickThrough()
 	{
@@ -117,7 +149,7 @@ public interface CollapsibleClassicConfig extends Config
 		name = "Reset all positions",
 		description = "Tick to put every dragged orb, the compass, the minimap, any moved preset and the side panel back in its normal place. It unticks itself.",
 		section = orbsSection,
-		position = 7
+		position = 8
 	)
 	default boolean resetOrbPositions()
 	{
@@ -125,21 +157,11 @@ public interface CollapsibleClassicConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "moveSidePanel",
-		name = "Move side panel",
-		description = "Let the whole side panel (frame, stones and inventory) be dragged anywhere as one piece while Alt is held. Alt right-click puts it back in the corner. Switch it off once placed: the panel stays put and Alt-clicks reach the inventory again.",
-		position = 4
-	)
-	default boolean moveSidePanel()
-	{
-		return false;
-	}
-
-	@ConfigItem(
 		keyName = "fillCollapsedGaps",
+		section = sidePanelSection,
 		name = "Fill collapsed gaps",
 		description = "When the side panel is closed, draw the inventory background behind the two stone rows so the game world does not show through between the stones. Uses the active resource pack's background.",
-		position = 5
+		position = 0
 	)
 	default boolean fillCollapsedGaps()
 	{
@@ -149,7 +171,8 @@ public interface CollapsibleClassicConfig extends Config
 	@ConfigSection(
 		name = "Status bars",
 		description = "Hitpoints and Prayer bars drawn over the two pillars. Turn off RuneLite's own Status Bars plugin to avoid two sets.",
-		position = 6
+		position = 1,
+		closedByDefault = true
 	)
 	String statusBarsSection = "statusBars";
 
@@ -162,7 +185,7 @@ public interface CollapsibleClassicConfig extends Config
 	)
 	default boolean statusBars()
 	{
-		return true;
+		return false;
 	}
 
 	@Range(max = 500)
@@ -180,134 +203,134 @@ public interface CollapsibleClassicConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "hideHitpointsOrb",
-		name = "Hide Hitpoints orb",
-		description = "Hide the Hitpoints orb beside the minimap.",
+		keyName = "hitpointsOrbVisibility",
+		name = "Hitpoints orb",
+		description = "When to hide the Hitpoints orb beside the minimap. The default layout is the game's own placement (Default orb positions on, or nothing moved); the moved layout is your dragged orbs or a preset.",
 		section = orbVisibilitySection,
 		position = 0
 	)
-	default boolean hideHitpointsOrb()
+	default OrbVisibility hitpointsOrb()
 	{
-		return false;
+		return OrbVisibility.SHOW;
 	}
 
 	@ConfigItem(
-		keyName = "hidePrayerOrb",
-		name = "Hide Prayer orb",
-		description = "Hide the Prayer orb beside the minimap. Quick-prayers can then only be toggled by hotkey.",
+		keyName = "prayerOrbVisibility",
+		name = "Prayer orb",
+		description = "When to hide the Prayer orb. The default layout is the game's own placement (Default orb positions on, or nothing moved); the moved layout is your dragged orbs or a preset.",
 		section = orbVisibilitySection,
 		position = 1
 	)
-	default boolean hidePrayerOrb()
+	default OrbVisibility prayerOrb()
 	{
-		return false;
+		return OrbVisibility.SHOW;
 	}
 
 	@ConfigItem(
-		keyName = "hideRunOrb",
-		name = "Hide Run orb",
-		description = "Hide the Run energy orb beside the minimap.",
+		keyName = "runOrbVisibility",
+		name = "Run orb",
+		description = "When to hide the Run energy orb. The default layout is the game's own placement (Default orb positions on, or nothing moved); the moved layout is your dragged orbs or a preset.",
 		section = orbVisibilitySection,
 		position = 2
 	)
-	default boolean hideRunOrb()
+	default OrbVisibility runOrb()
 	{
-		return false;
+		return OrbVisibility.SHOW;
 	}
 
 	@ConfigItem(
-		keyName = "hideSpecialOrb",
-		name = "Hide Special attack orb",
-		description = "Hide the Special attack orb beside the minimap.",
+		keyName = "specialOrbVisibility",
+		name = "Special attack orb",
+		description = "When to hide the Special attack orb. The default layout is the game's own placement (Default orb positions on, or nothing moved); the moved layout is your dragged orbs or a preset.",
 		section = orbVisibilitySection,
 		position = 3
 	)
-	default boolean hideSpecialOrb()
+	default OrbVisibility specialOrb()
 	{
-		return false;
+		return OrbVisibility.SHOW;
 	}
 
 	@ConfigItem(
-		keyName = "hideXpButton",
-		name = "Hide XP button",
-		description = "Hide the XP button beside the minimap.",
+		keyName = "xpButtonVisibility",
+		name = "XP button",
+		description = "When to hide the XP drops button. The default layout is the game's own placement (Default orb positions on, or nothing moved); the moved layout is your dragged orbs or a preset.",
 		section = orbVisibilitySection,
 		position = 4
 	)
-	default boolean hideXpButton()
+	default OrbVisibility xpButton()
 	{
-		return false;
+		return OrbVisibility.SHOW;
 	}
 
 	@ConfigItem(
-		keyName = "hideWorldMapOrb",
-		name = "Hide World map orb",
-		description = "Hide the World map orb beside the minimap.",
+		keyName = "worldMapOrbVisibility",
+		name = "World map orb",
+		description = "When to hide the world map orb. The default layout is the game's own placement (Default orb positions on, or nothing moved); the moved layout is your dragged orbs or a preset.",
 		section = orbVisibilitySection,
 		position = 5
 	)
-	default boolean hideWorldMapOrb()
+	default OrbVisibility worldMapOrb()
 	{
-		return false;
+		return OrbVisibility.SHOW;
 	}
 
 	@ConfigItem(
-		keyName = "hideWikiBanner",
-		name = "Hide Wiki banner",
-		description = "Hide the Wiki banner under the minimap.",
+		keyName = "wikiBannerVisibility",
+		name = "Wiki banner",
+		description = "When to hide the Wiki banner. The default layout is the game's own placement (Default orb positions on, or nothing moved); the moved layout is your dragged orbs or a preset.",
 		section = orbVisibilitySection,
 		position = 6
 	)
-	default boolean hideWikiBanner()
+	default OrbVisibility wikiBanner()
 	{
-		return false;
+		return OrbVisibility.SHOW;
 	}
 
 	@ConfigItem(
-		keyName = "hideActivityOrb",
-		name = "Hide Activity Adviser orb",
-		description = "Hide the Activity Adviser orb beside the minimap.",
+		keyName = "activityOrbVisibility",
+		name = "Activity adviser",
+		description = "When to hide the activity adviser orb. The default layout is the game's own placement (Default orb positions on, or nothing moved); the moved layout is your dragged orbs or a preset.",
 		section = orbVisibilitySection,
 		position = 7
 	)
-	default boolean hideActivityOrb()
+	default OrbVisibility activityOrb()
 	{
-		return false;
+		return OrbVisibility.SHOW;
 	}
 
 	@ConfigItem(
-		keyName = "hideStoreOrb",
-		name = "Hide Store orb",
-		description = "Hide the Store orb beside the minimap.",
+		keyName = "storeOrbVisibility",
+		name = "Store orb",
+		description = "When to hide the store orb. The default layout is the game's own placement (Default orb positions on, or nothing moved); the moved layout is your dragged orbs or a preset.",
 		section = orbVisibilitySection,
 		position = 8
 	)
-	default boolean hideStoreOrb()
+	default OrbVisibility storeOrb()
 	{
-		return false;
+		return OrbVisibility.SHOW;
 	}
 
 	@ConfigItem(
-		keyName = "hideCompass",
-		name = "Hide compass",
-		description = "Hide the compass in Resizable Modern.",
+		keyName = "compassVisibility",
+		name = "Compass",
+		description = "When to hide the compass. The default layout is the game's own placement (Default orb positions on, or nothing moved); the moved layout is your dragged orbs or a preset.",
 		section = orbVisibilitySection,
 		position = 10
 	)
-	default boolean hideCompass()
+	default OrbVisibility compass()
 	{
-		return false;
+		return OrbVisibility.SHOW;
 	}
 
 	@ConfigItem(
-		keyName = "hideMinimap",
-		name = "Hide minimap",
-		description = "Hide the minimap itself in Resizable Modern. The compass and orbs stay, and can be dragged elsewhere while Alt is held. Right-clicking the world map orb and choosing Minimise minimap (or Restore minimap) flips this too.",
+		keyName = "minimapVisibility",
+		name = "Minimap",
+		description = "When to hide the minimap itself (the compass and orbs stay). Right-clicking the world map orb and choosing Minimise or Restore minimap flips it for the layout you're in. The default layout is the game's own placement (Default orb positions on, or nothing moved); the moved layout is your dragged orbs or a preset.",
 		section = orbVisibilitySection,
 		position = 9
 	)
-	default boolean hideMinimap()
+	default OrbVisibility minimap()
 	{
-		return false;
+		return OrbVisibility.SHOW;
 	}
 }

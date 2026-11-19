@@ -49,6 +49,7 @@ class ClassicFrame
 	private static final int LOGOUT_ICON_SPRITE = 907, LOGOUT_PANEL = 10, LOGOUT_SLOT = 3;
 	// Read from Modern's own logout button (ToplevelPreEoc.STONE10): [914, event_op, 1131, 10].
 	private static final int SIDEBUTTON_OP_SCRIPT = 914, EVENT_OP = -2147483644, LOGOUT_OP_ARGUMENT = 1131;
+	private static final int[] NO_COMPONENTS = {};
 	private static final int[] MODERN_LOGOUT = {InterfaceID.ToplevelPreEoc.STONE10, InterfaceID.ToplevelPreEoc.ICON10};
 
 	/** Modern's stones and their icons, in the game's own order. Index 10 is logout, which Modern keeps elsewhere. */
@@ -87,6 +88,8 @@ class ClassicFrame
 	private Rectangle leftBar, rightBar;
 	// Where the whole panel would sit when open, for the Alt-drag box; null while the frame is absent.
 	private Rectangle panelArea;
+	// Set by the plugin: Hide Modern logout X is on and Compact Orbs is not handling the X.
+	private boolean hideLogoutX = true;
 	// Modern's own highlight, learned the first time it is seen, so it can be put back when the frame is removed.
 	private int modernSelected = -1;
 	private boolean modernTiling;
@@ -115,10 +118,31 @@ class ClassicFrame
 		return panelArea;
 	}
 
-	/**
-	 * Where the open panel's top-left corner was dragged to, or null for its normal place. Kept with Move side panel
-	 * off too, so it can be switched off (giving Alt-clicks back to the inventory) once the panel is placed.
-	 */
+	/** Whether the side panel was open when the frame was last drawn. */
+	boolean isOpen()
+	{
+		return lastOpen;
+	}
+
+	void setHideLogoutX(boolean hide)
+	{
+		hideLogoutX = hide;
+	}
+
+	/** The bottom stone row, which sits in the same place open or closed; null while the frame is absent. */
+	Rectangle bottomRowArea()
+	{
+		return panelArea == null ? null
+			: new Rectangle(panelArea.x, panelArea.y + OPEN_HEIGHT - ROW_HEIGHT, FRAME_WIDTH, ROW_HEIGHT);
+	}
+
+	/** Where the open panel's top-left corner goes for a bottom stone row at this point. */
+	static Point panelOriginForBottomRow(Point row)
+	{
+		return new Point(row.x, row.y - OPEN_HEIGHT + ROW_HEIGHT);
+	}
+
+	/** Where the open panel's top-left corner was dragged to, or null for its normal place. */
 	private Point savedPosition()
 	{
 		return configManager.getConfiguration(CollapsibleClassicConfig.GROUP, SidePanelMover.KEY, Point.class);
@@ -273,9 +297,12 @@ class ClassicFrame
 			door.setOnOpListener(SIDEBUTTON_OP_SCRIPT, EVENT_OP, LOGOUT_OP_ARGUMENT, LOGOUT_PANEL);
 			door.revalidate();
 		}
-		for (int component : MODERN_LOGOUT)
+		if (hideLogoutX)
 		{
-			states.hide(client.getWidget(component));
+			for (int component : MODERN_LOGOUT)
+			{
+				states.hide(client.getWidget(component));
+			}
 		}
 		applied = true;
 
@@ -361,7 +388,7 @@ class ClassicFrame
 			return true;
 		}
 
-		for (int component : MODERN_LOGOUT)
+		for (int component : hideLogoutX ? MODERN_LOGOUT : NO_COMPONENTS)
 		{
 			Widget logout = client.getWidget(component);
 			if (logout != null && !logout.isSelfHidden())

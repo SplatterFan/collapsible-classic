@@ -17,17 +17,15 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.OverlayPosition;
 
 /**
- * One Alt-drag box over the whole classic side panel, so the frame, both stone rows and the panel contents move as
- * one piece. The box is always the size of the open panel, because a closed panel is shorter but sits in the same
- * place: the saved position is the open panel's top-left corner, and a closed panel keeps the same bottom edge.
+ * An Alt-drag box over the bottom stone row that moves the whole classic side panel (frame, both stone rows and the
+ * panel contents) as one piece. The bottom row is used because it sits in the same place whether the panel is open
+ * or closed, and because a box there leaves Alt-clicks inside the inventory alone. The saved position is the open
+ * panel's top-left corner; a closed panel keeps the same bottom edge.
  */
 @Singleton
 class SidePanelMover extends Overlay
 {
 	static final String KEY = "sidePanelPosition";
-
-	@Inject
-	private CollapsibleClassicConfig config;
 
 	@Inject
 	private ConfigManager configManager;
@@ -56,7 +54,7 @@ class SidePanelMover extends Overlay
 	@Override
 	public String getName()
 	{
-		return "COLLAPSIBLE_CLASSIC_SIDE_PANEL";
+		return "COLLAPSIBLE_CLASSIC_SIDE_PANEL_ROW";
 	}
 
 	void start(Runnable refresh)
@@ -104,8 +102,8 @@ class SidePanelMover extends Overlay
 		}
 		reset = false;
 
-		Rectangle panel = config.moveSidePanel() ? frame.panelArea() : null;
-		if (panel == null)
+		Rectangle row = frame.bottomRowArea();
+		if (row == null)
 		{
 			getBounds().setSize(0, 0);
 			return null;
@@ -116,14 +114,14 @@ class SidePanelMover extends Overlay
 			if (!canvas.equals(lastApplied))
 			{
 				lastApplied = new Point(canvas);
-				configManager.setConfiguration(CollapsibleClassicConfig.GROUP, KEY, canvas);
+				configManager.setConfiguration(CollapsibleClassicConfig.GROUP, KEY, ClassicFrame.panelOriginForBottomRow(canvas));
 				refresh.run();
 			}
 		}
 		else
 		{
-			getBounds().setLocation(panel.getLocation());
+			getBounds().setLocation(row.getLocation());
 		}
-		return panel.getSize();
+		return row.getSize();
 	}
 }
