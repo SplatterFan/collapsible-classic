@@ -86,6 +86,8 @@ class StatusBars extends Overlay
 	private final Image heartPoison = ImageUtil.loadImageResource(AlternateSprites.class, AlternateSprites.POISON_HEART);
 	private final Image heartVenom = ImageUtil.loadImageResource(AlternateSprites.class, AlternateSprites.VENOM_HEART);
 	private int checkedTick = -1, lastCombatTick;
+	// Set when a hitsplat lands on you; read (and cleared) by the next combat check.
+	private volatile boolean hitThisTick;
 	private boolean displayed = true;
 
 	StatusBars()
@@ -101,16 +103,17 @@ class StatusBars extends Overlay
 		{
 			return null;
 		}
+		// Checked even while the panel is closed, so the combat countdown stays right.
+		if (client.getTickCount() != checkedTick)
+		{
+			checkedTick = client.getTickCount();
+			checkCombat();
+		}
 		Rectangle left = frame.leftBar();
 		Rectangle right = frame.rightBar();
 		if (left == null || right == null)
 		{
 			return null;
-		}
-		if (client.getTickCount() != checkedTick)
-		{
-			checkedTick = client.getTickCount();
-			checkCombat();
 		}
 		if (!displayed)
 		{
@@ -276,22 +279,27 @@ class StatusBars extends Overlay
 			return;
 		}
 		Actor target = local.getInteracting();
-		boolean fighting = false;
+		boolean fighting = hitThisTick;
+		hitThisTick = false;
 		if (target instanceof NPC)
 		{
-			NPCComposition composition = ((NPC) target).getComposition();
-			String[] actions = composition == null ? null : composition.getActions();
-			if (actions != null)
-			{
-				for (String action : actions)
-				{
-					fighting |= "Attack".equals(action);
-				}
-			}
+			fighting |= attackable((NPC) target);
 		}
 		else if (target instanceof Player)
 		{
-			fighting = client.getVarbitValue(VarbitID.PVP_AREA_CLIENT) == 1;
+			fighting |= client.getVarbitValue(VarbitID.PVP_AREA_CLIENT) == 1;
+		}
+		// Being attacked counts too, even while walking, skilling or running away: any attackable NPC targeting you.
+		if (!fighting && client.getTopLevelWorldView() != null)
+		{
+			for (NPC npc : client.getTopLevelWorldView().npcs())
+			{
+				if (npc != null && npc.getInteracting() == local && attackable(npc))
+				{
+					fighting = true;
+					break;
+				}
+			}
 		}
 		if (fighting)
 		{
@@ -302,5 +310,29 @@ class StatusBars extends Overlay
 		{
 			displayed = false;
 		}
+	}
+
+	/** An NPC you could fight: it has an Attack option. */
+	private static boolean attackable(NPC npc)
+	{
+		NPCComposition composition = npc.getComposition();
+		String[] actions = composition == null ? null : composition.getActions();
+		if (actions != null)
+		{
+			for (String action : actions)
+			{
+				if ("Attack".equals(action))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/** Called by the plugin when a hitsplat lands on you, so taking damage always counts as combat. */
+	void tookHit()
+	{
+		hitThisTick = true;
 	}
 }

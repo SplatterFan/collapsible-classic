@@ -21,6 +21,7 @@ import net.runelite.api.ScriptID;
 import net.runelite.api.events.BeforeRender;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.MenuEntryAdded;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.ScriptPostFired;
@@ -584,6 +585,16 @@ public class CollapsibleClassicPlugin extends Plugin
 		}
 		String text = ((option == null ? "" : option) + " " + (target == null ? "" : target)).toLowerCase();
 		return text.contains("minimap") || text.contains("minimise") || text.contains("minimize");
+	}
+
+	@Subscribe
+	public void onHitsplatApplied(HitsplatApplied event)
+	{
+		// Taking damage counts as combat for the status bars, even when you aren't attacking anything.
+		if (running && event.getActor() == client.getLocalPlayer())
+		{
+			statusBars.tookHit();
+		}
 	}
 
 	@Subscribe
