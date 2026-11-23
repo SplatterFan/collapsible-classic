@@ -2,6 +2,12 @@
 
 A RuneLite plugin that gives **Resizable – Modern layout** the look of **Resizable – Classic layout**, while keeping the one thing Modern does better: clicking the active tab collapses the side panel out of the way.
 
+## The idea
+
+Collapsible Classic is about a **minimal** screen. Collapse the side panel, tuck the orbs away, and keep the game world clear, then **return to the original layout at any time** with one click, a hotkey, or just by opening the panel again.
+
+The orb customisation is built for **looks**: moving, hiding and laying out the orbs so the screen stays tidy. It doesn't try to match the depth of dedicated orb plugins. If you want more from your orbs, use [Compact Orbs](https://github.com/its-cue/compact-orbs); this plugin works alongside it and leaves the orbs to it automatically.
+
 ## What it does
 
 - Draws the classic side panel frame around Modern's panel: the tapered stone rows, the two pillars and the backdrop.
