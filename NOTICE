@@ -1,0 +1,26 @@
+Collapsible Classic
+Copyright (c) 2026, SplatterFan
+
+This plugin includes code adapted from the following BSD 2-Clause licensed
+projects. Each source file that contains such code keeps the original
+copyright and license header.
+
+Interface Layout (https://github.com/wukuna/interface-layout)
+  The widget state handling, canvas expansion and redraw handling.
+  Copyright (c) 2018, Tomas Slusny <slusnucky@gmail.com>
+  Copyright (c) 2025, cue <https://github.com/its-cue>
+  Copyright (c) 2025, Richardant
+  Copyright (c) 2016-2017, Adam <Adam@sigterm.info>
+  Copyright (c) 2026, Frederick Campbell
+  Copyright (c) 2026, wukuna
+
+Compact Orbs (https://github.com/its-cue/compact-orbs)
+  The orb movement approach (orbs re-placed every frame from their drag boxes,
+  containers resized only temporarily, the world map and wiki treated as
+  right-edge pieces) and the preset orb layout coordinates.
+  Copyright (c) 2025, cue <https://github.com/its-cue>
+
+RuneLite Status Bars plugin (https://github.com/runelite/runelite)
+  The Hitpoints and Prayer status bars.
+  Copyright (c) 2018-2019, Jos <Malevolentdev@gmail.com>
+  Copyright (c) 2019, Rheon <https://github.com/Rheon-D>
