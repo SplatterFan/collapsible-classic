@@ -91,4 +91,4 @@ Turn off other plugins that rearrange the side stones or the side panel. RuneLit
 - The orb movement follows the approach of [Compact Orbs](https://github.com/its-cue/compact-orbs) by its-cue.
 - The status bars are adapted from RuneLite's own [Status Bars](https://github.com/runelite/runelite) plugin by Jos and Rheon.
 
-All three are BSD 2-Clause licensed, as is this plugin (see `LICENSE`). Full credits are in `NOTICE`, and each source file with adapted code keeps its original copyright header.
+All three are BSD 2-Clause licensed, as is this plugin (see `LICENSE`). Full credits are in `THIRD_PARTY_NOTICES`, and each source file with adapted code keeps its original copyright header.
